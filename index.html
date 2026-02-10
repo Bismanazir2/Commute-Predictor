@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Traffic Simulator – Jammu</title>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <style>
+    html, body, #map {
+      height: 100%;
+      margin: 0;
+    }
+
+    /* Tooltip styling */
+    .route-label {
+      background: rgba(15, 23, 42, 0.9);
+      color: #e5e7eb;
+      border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 6px;
+      padding: 2px 6px;
+      font-size: 11px;
+      font-weight: 500;
+      white-space: nowrap;
+    }
+  </style>
+</head>
+
+<body class="bg-slate-900 text-white">
+
+<div class="flex h-screen">
+
+  <!-- LEFT PANEL -->
+  <div class="w-[360px] bg-slate-900/95 p-4 border-r border-white/10">
+    <h1 class="text-xl font-bold mb-3">🚦 Traffic Simulator (Jammu)</h1>
+
+    <label class="text-sm text-slate-400">Focus Location</label>
+    <select id="locationSelect"
+      class="w-full mt-1 p-2 bg-black/40 border border-white/10 rounded">
+      <option value="">-- Select --</option>
+      <option>Bahu Plaza</option>
+      <option>Gandhi Nagar</option>
+      <option>Channi</option>
+      <option>Bathindi</option>
+    </select>
+
+    <p class="mt-4 text-xs text-slate-500">
+      4 fixed routes • 1 car per route • live labels
+    </p>
+  </div>
+
+  <!-- MAP -->
+  <div id="map" class="flex-1"></div>
+</div>
+
+<script>
+/* ---------------- MAP ---------------- */
+const map = L.map("map").setView([32.700, 74.860], 13);
+L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(map);
+
+/* ---------------- LOCATIONS ---------------- */
+const LOCATIONS = {
+  "Bahu Plaza": [32.7085, 74.8570],
+  "Gandhi Nagar": [32.7064, 74.8741],
+  "Channi": [32.6880, 74.8605],
+  "Bathindi": [32.6826, 74.8297]
+};
+
+/* ---------------- ROUTES (FIXED) ---------------- */
+const ROUTES = [
+  ["Bahu Plaza", "Gandhi Nagar"],
+  ["Gandhi Nagar", "Channi"],
+  ["Channi", "Bathindi"],
+  ["Bathindi", "Bahu Plaza"]
+];
+
+/* ---------------- CAR ICON ---------------- */
+const carIcon = L.divIcon({
+  html: `<div style="font-size:22px; transform: translate(-50%, -50%);">🚗</div>`,
+  iconSize: [22, 22],
+  iconAnchor: [11, 11],
+  className: ""
+});
+
+/* ---------------- STATE ---------------- */
+let cars = [];
+
+/* ---------------- HELPERS ---------------- */
+function lerp(a, b, t) {
+  return a + (b - a) * t;
+}
+
+/* ---------------- INIT SIMULATION ---------------- */
+function initSimulation() {
+
+  ROUTES.forEach(route => {
+    const fromName = route[0];
+    const toName = route[1];
+
+    const start = LOCATIONS[fromName];
+    const end = LOCATIONS[toName];
+
+    // draw route path
+    const path = L.polyline([start, end], {
+      color: "#3b82f6",
+      weight: 3,
+      dashArray: "6 6"
+    }).addTo(map);
+
+    // car marker
+    const marker = L.marker(start, { icon: carIcon }).addTo(map);
+
+    // tooltip showing source → destination
+    marker.bindTooltip(
+      `${fromName} → ${toName}`,
+      {
+        permanent: true,
+        direction: "top",
+        offset: [0, -14],
+        className: "route-label"
+      }
+    );
+
+    cars.push({
+      marker,
+      path,
+      start,
+      end,
+      fromName,
+      toName,
+      t: Math.random()
+    });
+  });
+
+  // movement loop
+  setInterval(() => {
+    cars.forEach(car => {
+      car.t += 0.02;
+
+      if (car.t >= 1) {
+        car.t = 0;
+
+        // swap direction
+        const tmp = car.start;
+        car.start = car.end;
+        car.end = tmp;
+
+        const tmpName = car.fromName;
+        car.fromName = car.toName;
+        car.toName = tmpName;
+
+        car.path.setLatLngs([car.start, car.end]);
+
+        // update label text
+        car.marker.setTooltipContent(
+          `${car.fromName} → ${car.toName}`
+        );
+      }
+
+      const lat = lerp(car.start[0], car.end[0], car.t);
+      const lng = lerp(car.start[1], car.end[1], car.t);
+
+      car.marker.setLatLng([lat, lng]);
+    });
+  }, 1000);
+}
+
+/* ---------------- FOCUS HANDLER ---------------- */
+document.getElementById("locationSelect")
+  .addEventListener("change", e => {
+    const key = e.target.value;
+    if (key) {
+      map.setView(LOCATIONS[key], 15, { animate: true });
+    }
+  });
+
+/* ---------------- AUTO START ---------------- */
+initSimulation();
+</script>
+
+</body>
+</html>
+
